@@ -1,0 +1,89 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {uid} (Firebase Auth UID) or 'guest_local_user'
+    // Fields:
+    //   - uid: string (required) - Auth UID or 'guest_local_user'
+    //   - email: string (required) - User email
+    //   - displayName: string (optional) - User name
+    //   - photoURL: string (optional) - User photo
+    //   - cPoints: number (optional) - Coding points
+    //   - bPoints: number (optional) - Doubt points
+    //   - easyTestsDone: number (optional) - Count of easy tests
+    //   - completedQuestions: list (optional) - List of question IDs
+    //   - createdAt: timestamp (optional) - Creation time
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return (isAuthenticated() && request.auth.uid == userId) || userId == "guest_local_user";
+    }
+    
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+    
+    function isValidUser(data) {
+      return data.uid is string && (data.uid == "guest_local_user" || (isAuthenticated() && data.uid == request.auth.uid)) &&
+             data.email is string &&
+             (!('displayName' in data) || data.displayName is string) &&
+             (!('photoURL' in data) || data.photoURL is string) &&
+             (!('cPoints' in data) || data.cPoints is number) &&
+             (!('bPoints' in data) || data.bPoints is number) &&
+             (!('easyTestsDone' in data) || data.easyTestsDone is number) &&
+             (!('completedQuestions' in data) || data.completedQuestions is list) &&
+             (!('solvedHistory' in data) || data.solvedHistory is list) &&
+             (!('codePathProgress' in data) || data.codePathProgress is map) &&
+             (!('careerRoadmaps' in data) || data.careerRoadmaps is map) &&
+             (!('careerMentorData' in data) || data.careerMentorData is map) &&
+             (!('careerPremiumPaths' in data) || data.careerPremiumPaths is map) &&
+             (!('dayStreak' in data) || data.dayStreak is number) &&
+             (!('lastActiveDateIST' in data) || data.lastActiveDateIST is string) &&
+             (!('openedDates' in data) || data.openedDates is list) &&
+             (!('createdAt' in data) || data.createdAt is timestamp);
+    }
+
+    function isValidHistoryCacheRecord(data) {
+      return data.userId is string && (data.userId == "guest_local_user" || (isAuthenticated() && data.userId == request.auth.uid)) &&
+             data.timestamp is timestamp &&
+             data.actionType is string && (data.actionType == 'module_completed' || data.actionType == 'test_submitted') &&
+             data.payload is map &&
+             data.strategy == 'immutable-append' &&
+             data.lifecycle == 'permanent_cache';
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) &&
+                    request.resource.data.uid == resource.data.uid &&
+                    request.resource.data.email == resource.data.email;
+    }
+
+    match /user_history_cache/{recordId} {
+      allow create: if (isAuthenticated() || request.resource.data.userId == "guest_local_user") && 
+                    isValidHistoryCacheRecord(request.resource.data) && 
+                    request.resource.data.timestamp == request.time;
+      allow read: if (isAuthenticated() && resource.data.userId == request.auth.uid) || 
+                  resource.data.userId == "guest_local_user";
+      allow update, delete: if false;
+    }
+    
+    match /test/connection {
+      allow read: if true;
+    }
+  }
+}

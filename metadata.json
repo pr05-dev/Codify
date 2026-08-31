@@ -1,0 +1,8 @@
+{
+  "name": "Codify - AI Code Mentor",
+  "description": "An AI-powered code analysis tool for beginners that identifies mistakes, explains confusing code, and suggests learning concepts with examples. Includes challenges for OOPS, DSA, and CS fundamentals.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
